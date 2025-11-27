@@ -141,6 +141,7 @@ markButton.MouseButton1Click:Connect(function()
 	markerPart.Parent = workspace
 end)
 
+--// Build tilted slide respecting width x steps
 buildButton.MouseButton1Click:Connect(function()
 	if not markedCFrame then warn("No mark!") return end
 
@@ -150,18 +151,15 @@ buildButton.MouseButton1Click:Connect(function()
 	local right = markedCFrame.RightVector
 	local up = Vector3.new(0,1,0)
 	local halfW = math.floor(width/2)
-
-	local tiltAngle = 60 -- tilt in degrees
 	local verticalRise = 2.5
-	local forwardOffset = verticalRise / math.tan(math.rad(tiltAngle))
+	local forwardOffset = 2.5
 
 	for step = 0, steps-1 do
 		for x = -halfW, halfW-1 + (width%2) do
 			local pos = startPos + forward*step*forwardOffset + right*x*tileSize + up*step*verticalRise
-			local baseCF = CFrame.lookAt(pos, pos + forward)
-			local cf = baseCF * CFrame.Angles(math.rad(tiltAngle), 0, 0)
+			local cf = CFrame.new(pos, pos + forward) * CFrame.Angles(math.rad(45), 0, 0)
 			buildRemote:InvokeServer("Metal Sheet", cf, workspace:WaitForChild("Surface"))
-			task.wait(0.03)
+			task.wait(0.04)
 		end
 	end
 
