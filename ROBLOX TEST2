@@ -200,7 +200,7 @@ placeButton.MouseButton1Click:Connect(function()
 					)
 
 					local args = {
-						"Metal Sheet",
+						"Planks",
 						CFrame.new(pos),
 						workspace:WaitForChild("Surface")
 					}
