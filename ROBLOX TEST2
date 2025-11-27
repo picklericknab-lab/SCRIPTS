@@ -1,0 +1,226 @@
+--// LocalScript: Platform Builder (Compact GUI with proper Minimize and Trash Button)
+
+--// Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+--// Player
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+
+--// Remote
+local buildRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("BuildRequest")
+
+--// GUI Setup
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+gui.Name = "PlatformGUI"
+gui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 220, 0, 150)
+frame.Position = UDim2.new(0.5, -110, 0.5, -75)
+frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+
+--// Close Button
+local close = Instance.new("TextButton", frame)
+close.Size = UDim2.new(0, 20, 0, 20)
+close.Position = UDim2.new(1, -25, 0, 5)
+close.Text = "X"
+close.TextColor3 = Color3.new(1, 0, 0)
+close.BackgroundColor3 = Color3.fromRGB(80, 0, 0)
+close.Font = Enum.Font.SourceSansBold
+close.TextSize = 14
+
+--// Minimize Button
+local minimizeBtn = Instance.new("TextButton", frame)
+minimizeBtn.Size = UDim2.new(0, 20, 0, 20)
+minimizeBtn.Position = UDim2.new(1, -50, 0, 5)
+minimizeBtn.Text = "_"
+minimizeBtn.TextColor3 = Color3.new(1, 1, 1)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+minimizeBtn.Font = Enum.Font.SourceSansBold
+minimizeBtn.TextSize = 14
+
+--// Trash Button
+local trashBtn = Instance.new("TextButton", frame)
+trashBtn.Size = UDim2.new(0, 20, 0, 20)
+trashBtn.Position = UDim2.new(1, -75, 0, 5)
+trashBtn.Text = "🗑️"
+trashBtn.TextColor3 = Color3.new(1, 1, 1)
+trashBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+trashBtn.Font = Enum.Font.SourceSansBold
+trashBtn.TextSize = 14
+
+trashBtn.MouseButton1Click:Connect(function()
+	local destroyRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("DestroyAllBuilds")
+	destroyRemote:FireServer()
+end)
+
+--// Title
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, -90, 0, 25)
+title.Position = UDim2.new(0, 10, 0, 5)
+title.BackgroundTransparency = 1
+title.Text = "Pyramid Builder"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 16
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+--// Size Label & Box
+local sizeLabel = Instance.new("TextLabel", frame)
+sizeLabel.Size = UDim2.new(0.9, 0, 0, 15)
+sizeLabel.Position = UDim2.new(0.05, 0, 0.2, 0)
+sizeLabel.BackgroundTransparency = 1
+sizeLabel.Text = "Base Size (odd number):"
+sizeLabel.TextColor3 = Color3.new(1, 1, 1)
+sizeLabel.Font = Enum.Font.SourceSans
+sizeLabel.TextSize = 14
+
+local sizeBox = Instance.new("TextBox", frame)
+sizeBox.Size = UDim2.new(0.9, 0, 0, 25)
+sizeBox.Position = UDim2.new(0.05, 0, 0.33, 0)
+sizeBox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+sizeBox.TextColor3 = Color3.new(1, 1, 1)
+sizeBox.PlaceholderText = "21"
+sizeBox.Font = Enum.Font.SourceSans
+sizeBox.TextSize = 16
+sizeBox.ClearTextOnFocus = false
+sizeBox.Text = "21"
+
+--// Buttons
+local markButton = Instance.new("TextButton", frame)
+markButton.Size = UDim2.new(0.9, 0, 0, 30)
+markButton.Position = UDim2.new(0.05, 0, 0.53, 0)
+markButton.Text = "Mark Area"
+markButton.Font = Enum.Font.SourceSans
+markButton.TextSize = 14
+markButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+markButton.TextColor3 = Color3.new(1, 1, 1)
+
+local placeButton = Instance.new("TextButton", frame)
+placeButton.Size = UDim2.new(0.9, 0, 0, 30)
+placeButton.Position = UDim2.new(0.05, 0, 0.75, 0)
+placeButton.Text = "Place Pyramid"
+placeButton.Font = Enum.Font.SourceSans
+placeButton.TextSize = 14
+placeButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+placeButton.TextColor3 = Color3.new(1, 1, 1)
+
+--// Variables
+local minimized = false
+local markedPos = nil
+local markerPart = nil
+local tileSize = 3.8
+local gap = 0.1 -- <-- Adjust this to increase/decrease space between blocks
+
+---------------------------------------------------------------------
+-- Helper: Parse size
+---------------------------------------------------------------------
+local function getBaseSize()
+    local size = tonumber(sizeBox.Text)  -- read the current value in the textbox
+    if not size or size < 5 then size = 5 end
+    if size % 2 == 0 then size = size + 1 end
+    return size
+end
+
+--// Minimize Logic
+local elementsToHide = {title, sizeLabel, sizeBox, markButton, placeButton}
+minimizeBtn.MouseButton1Click:Connect(function()
+	minimized = not minimized
+	if minimized then
+		for _, el in pairs(elementsToHide) do el.Visible = false end
+		frame.Size = UDim2.new(0, 80, 0, 25)
+		close.Position = UDim2.new(1, -25, 0, 2)
+		minimizeBtn.Position = UDim2.new(1, -50, 0, 2)
+		trashBtn.Position = UDim2.new(1, -75, 0, 2)
+	else
+		for _, el in pairs(elementsToHide) do el.Visible = true end
+		frame.Size = UDim2.new(0, 220, 0, 150)
+		close.Position = UDim2.new(1, -25, 0, 5)
+		minimizeBtn.Position = UDim2.new(1, -50, 0, 5)
+		trashBtn.Position = UDim2.new(1, -75, 0, 5)
+	end
+end)
+
+---------------------------------------------------------------------
+-- Mark Area (Fixed Coordinate)
+---------------------------------------------------------------------
+markButton.MouseButton1Click:Connect(function()
+    -- Always mark the fixed coordinate
+    local fixedPos = Vector3.new(-3.14, 65.00, -0.38)
+    markedPos = fixedPos
+
+    if markerPart then markerPart:Destroy() end
+
+    local baseSize = getBaseSize()
+    local total = baseSize * tileSize
+
+    markerPart = Instance.new("Part")
+    markerPart.Anchored = true
+    markerPart.Size = Vector3.new(total, 1, total)
+    markerPart.Position = markedPos + Vector3.new(0, 0.5, 0)
+    markerPart.Color = Color3.fromRGB(0, 255, 0)
+    markerPart.Transparency = 0.4
+    markerPart.Material = Enum.Material.Neon
+    markerPart.CanCollide = false
+    markerPart.Parent = workspace
+end)
+
+---------------------------------------------------------------------
+-- Place Upside-Down Hollow Pyramid (Build from Bottom to Top)
+---------------------------------------------------------------------
+placeButton.MouseButton1Click:Connect(function()
+	if not markedPos then
+		warn("No marked area!")
+		return
+	end
+
+	local startPos = Vector3.new(-3.14, 65.00, -0.38) -- fixed spawn coordinate (bottom layer)
+	local baseSize = getBaseSize()  
+	local height = math.ceil(baseSize / 2)
+
+	for layer = 0, height - 1 do
+		-- Bottom-up building: smallest layer at bottom, largest at top
+		local layerSize = 1 + (layer * 2)
+		local y = startPos.Y + layer  -- build upward
+
+		for x = -layerSize//2, layerSize//2 do
+			for z = -layerSize//2, layerSize//2 do
+				-- Build only the border
+				if x == -layerSize//2 or x == layerSize//2 or z == -layerSize//2 or z == layerSize//2 then
+					local pos = Vector3.new(
+						startPos.X + x*(tileSize + gap),
+						y,
+						startPos.Z + z*(tileSize + gap)
+					)
+
+					local args = {
+						"Metal Sheet",
+						CFrame.new(pos),
+						workspace:WaitForChild("Surface")
+					}
+
+					buildRemote:InvokeServer(unpack(args))
+					task.wait(0.05)
+				end
+			end
+		end
+	end
+
+	if markerPart then
+		markerPart:Destroy()
+		markerPart = nil
+	end
+end)
+
+--------------------
+--// Close GUI
+--------------------
+close.MouseButton1Click:Connect(function()
+	gui:Destroy()
+end)
