@@ -1,0 +1,187 @@
+--// LocalScript: Directional Stair Builder V4 (Compact GUI with Minimize)
+
+--// Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+--// Player
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+
+--// Remote
+local buildRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("BuildRequest")
+
+--// GUI Setup
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+gui.Name = "DirectionalStairGUI"
+gui.ResetOnSpawn = false -- GUI persists after death
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 220, 0, 150)
+frame.Position = UDim2.new(0.5, -110, 0.5, -75)
+frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+
+--// X Button
+local close = Instance.new("TextButton", frame)
+close.Size = UDim2.new(0, 20, 0, 20)
+close.Position = UDim2.new(1, -25, 0, 5)
+close.Text = "X"
+close.TextColor3 = Color3.new(1, 0, 0)
+close.BackgroundColor3 = Color3.fromRGB(80, 0, 0)
+close.Font = Enum.Font.SourceSansBold
+close.TextSize = 14
+
+--// Minimize Button
+local minimizeBtn = Instance.new("TextButton", frame)
+minimizeBtn.Size = UDim2.new(0, 20, 0, 20)
+minimizeBtn.Position = UDim2.new(1, -50, 0, 5)
+minimizeBtn.Text = "_"
+minimizeBtn.TextColor3 = Color3.new(1, 1, 1)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+minimizeBtn.Font = Enum.Font.SourceSansBold
+minimizeBtn.TextSize = 14
+
+--// Remaining GUI elements
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, -60, 0, 25)
+title.Position = UDim2.new(0, 10, 0, 5)
+title.BackgroundTransparency = 1
+title.Text = "Stair Builder"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 16
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+local sizeLabel = Instance.new("TextLabel", frame)
+sizeLabel.Size = UDim2.new(0.9, 0, 0, 15)
+sizeLabel.Position = UDim2.new(0.05, 0, 0.2, 0)
+sizeLabel.BackgroundTransparency = 1
+sizeLabel.Text = "Size (Width x Steps):"
+sizeLabel.TextColor3 = Color3.new(1, 1, 1)
+sizeLabel.Font = Enum.Font.SourceSans
+sizeLabel.TextSize = 14
+
+local sizeBox = Instance.new("TextBox", frame)
+sizeBox.Size = UDim2.new(0.9, 0, 0, 25)
+sizeBox.Position = UDim2.new(0.05, 0, 0.33, 0)
+sizeBox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+sizeBox.TextColor3 = Color3.new(1, 1, 1)
+sizeBox.PlaceholderText = "4x6"
+sizeBox.Font = Enum.Font.SourceSans
+sizeBox.TextSize = 16
+sizeBox.ClearTextOnFocus = false
+sizeBox.Text = "4x6"
+
+local markButton = Instance.new("TextButton", frame)
+markButton.Size = UDim2.new(0.9, 0, 0, 30)
+markButton.Position = UDim2.new(0.05, 0, 0.53, 0)
+markButton.Text = "Mark Facing"
+markButton.Font = Enum.Font.SourceSans
+markButton.TextSize = 14
+markButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+markButton.TextColor3 = Color3.new(1, 1, 1)
+
+local buildButton = Instance.new("TextButton", frame)
+buildButton.Size = UDim2.new(0.9, 0, 0, 30)
+buildButton.Position = UDim2.new(0.05, 0, 0.75, 0)
+buildButton.Text = "Build Stairs"
+buildButton.Font = Enum.Font.SourceSans
+buildButton.TextSize = 14
+buildButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+buildButton.TextColor3 = Color3.new(1, 1, 1)
+
+--// Variables
+local markedCFrame = nil
+local markerPart = nil
+local tileSize = 4
+local minimized = false
+
+--// Helper to parse size
+local function parseSize(text)
+	local w, s = text:lower():match("(%d+)%s*x%s*(%d+)")
+	w = tonumber(w) or 4
+	s = tonumber(s) or 6
+	return w, s
+end
+
+--// Get nearest cardinal facing
+local function getFacingDirection(cf)
+	local look = cf.LookVector
+	local dirs = {Vector3.new(0,0,-1), Vector3.new(0,0,1), Vector3.new(-1,0,0), Vector3.new(1,0,0)}
+	local bestDir, bestDot = dirs[1], -1
+	for _, d in ipairs(dirs) do
+		local dot = look:Dot(d)
+		if dot > bestDot then bestDot, bestDir = dot, d end
+	end
+	return bestDir
+end
+
+--// Mark position
+markButton.MouseButton1Click:Connect(function()
+	char = player.Character or player.CharacterAdded:Wait()
+	hrp = char:WaitForChild("HumanoidRootPart")
+	local dir = getFacingDirection(hrp.CFrame)
+	local baseY = hrp.Position.Y - (hrp.Size.Y/2) - 0.5
+	local markPos = hrp.Position + dir*10
+	markedCFrame = CFrame.new(markPos, markPos+dir)
+
+	if markerPart then markerPart:Destroy() end
+	markerPart = Instance.new("Part")
+	markerPart.Anchored = true
+	markerPart.Size = Vector3.new(4,1,4)
+	markerPart.Position = markPos
+	markerPart.Color = Color3.fromRGB(0,255,0)
+	markerPart.Transparency = 0.4
+	markerPart.Material = Enum.Material.Neon
+	markerPart.CanCollide = false
+	markerPart.Parent = workspace
+end)
+
+--// Build stairs
+buildButton.MouseButton1Click:Connect(function()
+	if not markedCFrame then warn("No mark!") return end
+	local width, steps = parseSize(sizeBox.Text)
+	local dir = markedCFrame.LookVector
+	local right = markedCFrame.RightVector
+	local up = Vector3.new(0,1,0)
+	local halfW = math.floor(width/2)
+	local startPos = markedCFrame.Position
+
+	for step = 1, steps do
+		local stepHeight = (step-1)*tileSize
+		local stepForward = (step-1)*tileSize
+		for x = -halfW, halfW-1 + (width%2) do
+			local pos = startPos + dir*stepForward + right*x*tileSize + up*stepHeight
+			buildRemote:InvokeServer("Metal Sheet", CFrame.new(pos), workspace:WaitForChild("Surface"))
+			task.wait(0.04)
+		end
+	end
+
+	if markerPart then markerPart:Destroy() markerPart=nil end
+end)
+
+--// Close button
+close.MouseButton1Click:Connect(function()
+	gui:Destroy()
+end)
+
+--// Minimize button logic
+local elementsToHide = {title, sizeLabel, sizeBox, markButton, buildButton}
+minimizeBtn.MouseButton1Click:Connect(function()
+	minimized = not minimized
+	if minimized then
+		for _, el in pairs(elementsToHide) do el.Visible = false end
+		frame.Size = UDim2.new(0, 57, 0, 25)
+		close.Position = UDim2.new(1, -25, 0, 2)
+		minimizeBtn.Position = UDim2.new(1, -50, 0, 2)
+	else
+		for _, el in pairs(elementsToHide) do el.Visible = true end
+		frame.Size = UDim2.new(0, 220, 0, 150)
+		close.Position = UDim2.new(1, -25, 0, 5)
+		minimizeBtn.Position = UDim2.new(1, -50, 0, 5)
+	end
+end)
