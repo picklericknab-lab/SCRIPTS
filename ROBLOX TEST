@@ -1,0 +1,244 @@
+--// LocalScript: Persistent Platform Builder (Fixed center + correct wall rotation)
+
+--// Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TeleportService = game:GetService("TeleportService")
+
+--// Player
+local player = Players.LocalPlayer
+
+--// Remote
+local buildRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("BuildRequest")
+
+--// Restore last GUI position or use default
+local lastPos = player:GetAttribute("PlatformGUI_Position") or Vector2.new(0.5, 0.5)
+
+--// GUI Setup
+local gui = Instance.new("ScreenGui")
+gui.Name = "PlatformGUI"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 220, 0, 150)
+frame.Position = UDim2.new(lastPos.X, -110, lastPos.Y, -75)
+frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+
+-- Save GUI position when dragged
+frame:GetPropertyChangedSignal("Position"):Connect(function()
+	player:SetAttribute("PlatformGUI_Position", Vector2.new(frame.Position.X.Scale, frame.Position.Y.Scale))
+end)
+
+--// Close Button
+local close = Instance.new("TextButton", frame)
+close.Size = UDim2.new(0, 20, 0, 20)
+close.Position = UDim2.new(1, -25, 0, 5)
+close.Text = "X"
+close.TextColor3 = Color3.new(1, 0, 0)
+close.BackgroundColor3 = Color3.fromRGB(80, 0, 0)
+close.Font = Enum.Font.SourceSansBold
+close.TextSize = 14
+close.MouseButton1Click:Connect(function()
+	gui:Destroy()
+end)
+
+--// Minimize Button
+local minimizeBtn = Instance.new("TextButton", frame)
+minimizeBtn.Size = UDim2.new(0, 20, 0, 20)
+minimizeBtn.Position = UDim2.new(1, -50, 0, 5)
+minimizeBtn.Text = "_"
+minimizeBtn.TextColor3 = Color3.new(1, 1, 1)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+minimizeBtn.Font = Enum.Font.SourceSansBold
+minimizeBtn.TextSize = 14
+
+--// Title
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, -120, 0, 25)
+title.Position = UDim2.new(0, 10, 0, 5)
+title.BackgroundTransparency = 1
+title.Text = "Center Builder"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 16
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+--// Size Label & Box
+local sizeLabel = Instance.new("TextLabel", frame)
+sizeLabel.Size = UDim2.new(0.9, 0, 0, 15)
+sizeLabel.Position = UDim2.new(0.05, 0, 0.2, 0)
+sizeLabel.BackgroundTransparency = 1
+sizeLabel.Text = "Size (Width x Length):"
+sizeLabel.TextColor3 = Color3.new(1, 1, 1)
+sizeLabel.Font = Enum.Font.SourceSans
+sizeLabel.TextSize = 14
+
+local sizeBox = Instance.new("TextBox", frame)
+sizeBox.Size = UDim2.new(0.9, 0, 0, 25)
+sizeBox.Position = UDim2.new(0.05, 0, 0.33, 0)
+sizeBox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+sizeBox.TextColor3 = Color3.new(1, 1, 1)
+sizeBox.PlaceholderText = "9x9"
+sizeBox.Font = Enum.Font.SourceSans
+sizeBox.TextSize = 16
+sizeBox.ClearTextOnFocus = false
+sizeBox.Text = "9x9"
+
+--// Buttons
+local markButton = Instance.new("TextButton", frame)
+markButton.Size = UDim2.new(0.9, 0, 0, 30)
+markButton.Position = UDim2.new(0.05, 0, 0.53, 0)
+markButton.Text = "Mark Area"
+markButton.Font = Enum.Font.SourceSans
+markButton.TextSize = 14
+markButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+markButton.TextColor3 = Color3.new(1, 1, 1)
+
+local placeButton = Instance.new("TextButton", frame)
+placeButton.Size = UDim2.new(0.9, 0, 0, 30)
+placeButton.Position = UDim2.new(0.05, 0, 0.75, 0)
+placeButton.Text = "Place Platform"
+placeButton.Font = Enum.Font.SourceSans
+placeButton.TextSize = 14
+placeButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+placeButton.TextColor3 = Color3.new(1, 1, 1)
+
+--// Variables
+local minimized = false
+local markedPos = nil
+local markerPart = nil
+local tileSize = 4
+
+--// Helper: Parse size
+local function getPlatformSize()
+	local text = sizeBox.Text:lower()
+	local width, length = text:match("(%d+)%s*x%s*(%d+)")
+	width = tonumber(width) or 9
+	length = tonumber(length) or width
+	return math.clamp(width, 1, 50), math.clamp(length, 1, 50)
+end
+
+--// Minimize Logic
+local elementsToHide = {title, sizeLabel, sizeBox, markButton, placeButton}
+minimizeBtn.MouseButton1Click:Connect(function()
+	minimized = not minimized
+	if minimized then
+		for _, el in pairs(elementsToHide) do el.Visible = false end
+		frame.Size = UDim2.new(0, 105, 0, 25)
+		close.Position = UDim2.new(1, -25, 0, 2)
+		minimizeBtn.Position = UDim2.new(1, -50, 0, 2)
+	else
+		for _, el in pairs(elementsToHide) do el.Visible = true end
+		frame.Size = UDim2.new(0, 220, 0, 150)
+		close.Position = UDim2.new(1, -25, 0, 5)
+		minimizeBtn.Position = UDim2.new(1, -50, 0, 5)
+	end
+end)
+
+-- Fixed center coordinate
+local fixedCenter = Vector3.new(-3.14, 74.10, -0.38)
+
+--// Mark Area (CENTERED)
+markButton.MouseButton1Click:Connect(function()
+	local width, length = getPlatformSize()
+	local totalX = width * tileSize
+	local totalZ = length * tileSize
+
+	markedPos = Vector3.new(
+		math.floor(fixedCenter.X / tileSize + 0.5) * tileSize,
+		fixedCenter.Y,
+		math.floor(fixedCenter.Z / tileSize + 0.5) * tileSize
+	)
+
+	if markerPart then markerPart:Destroy() end
+
+	markerPart = Instance.new("Part")
+	markerPart.Anchored = true
+	markerPart.Size = Vector3.new(totalX, 1, totalZ)
+	markerPart.Position = markedPos + Vector3.new(0, 0.5, 0)
+	markerPart.Color = Color3.fromRGB(0, 255, 0)
+	markerPart.Transparency = 0.4
+	markerPart.Material = Enum.Material.Neon
+	markerPart.CanCollide = false
+	markerPart.Parent = workspace
+end)
+
+--// Place Platform + Correct Walls
+placeButton.MouseButton1Click:Connect(function()
+	if not markedPos then
+		warn("No marked area!")
+		return
+	end
+
+	local width, length = getPlatformSize()
+
+	for x = 0, width - 1 do
+		for z = 0, length - 1 do
+			local offsetX = (x - (width - 1)/2) * tileSize
+			local offsetZ = (z - (length - 1)/2) * tileSize
+			local pos = Vector3.new(markedPos.X + offsetX, markedPos.Y + 0.6, markedPos.Z + offsetZ)
+			buildRemote:InvokeServer("Metal Sheet", CFrame.new(pos), workspace:WaitForChild("Surface"))
+			task.wait(0.05)
+		end
+	end
+
+	local pivotFolder = workspace:WaitForChild("PlacedBuildings"):WaitForChild("Metal Sheet")
+	local pivot
+	for _, obj in pairs(pivotFolder:GetChildren()) do
+		if obj.Name == "Pivot" then pivot = obj break end
+	end
+	if not pivot then
+		warn("Pivot not found")
+		if markerPart then markerPart:Destroy() markerPart=nil end
+		return
+	end
+
+	local function placeWallLayer(yOffset)
+		for x = 0, width - 1 do
+			local offsetX = (x - (width-1)/2)*tileSize
+			for _, zMult in ipairs({1,-1}) do
+				local wallPos = Vector3.new(markedPos.X + offsetX, markedPos.Y + yOffset, markedPos.Z + (length/2)*zMult*tileSize)
+				local args = {
+					"Metal Sheet",
+					CFrame.new(
+						wallPos.X, wallPos.Y, wallPos.Z,
+						-1, -8.742277657347586e-08, 3.82137093032941e-15,
+						0, -4.371138828673793e-08, -1,
+						8.742277657347586e-08, -1, 4.371138828673793e-08
+					),
+					pivot
+				}
+				buildRemote:InvokeServer(unpack(args))
+				task.wait(0.05)
+			end
+		end
+
+		for z = 0, length - 1 do
+			local offsetZ = (z - (length-1)/2)*tileSize
+			for _, xMult in ipairs({1,-1}) do
+				local wallPos = Vector3.new(markedPos.X + (width/2)*xMult*tileSize, markedPos.Y + yOffset, markedPos.Z + offsetZ)
+				local args = {
+					"Metal Sheet",
+					CFrame.new(
+						wallPos.X, wallPos.Y, wallPos.Z,
+						-4.371138828673793e-08, 1, -4.371138828673793e-08,
+						0, -4.371138828673793e-08, -1,
+						-1, -4.371138828673793e-08, 1.910685465164705e-15
+					),
+					pivot
+				}
+				buildRemote:InvokeServer(unpack(args))
+				task.wait(0.05)
+			end
+		end
+	end
+
+	placeWallLayer(2)
+	placeWallLayer(5)
+
+	if markerPart then markerPart:Destroy() markerPart = nil end
+end)
