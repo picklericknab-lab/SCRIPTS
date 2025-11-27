@@ -141,7 +141,6 @@ markButton.MouseButton1Click:Connect(function()
 	markerPart.Parent = workspace
 end)
 
---// Build properly aligned tilted slide in any direction
 --// Build tilted slide respecting width x steps and local rotation
 buildButton.MouseButton1Click:Connect(function()
 	if not markedCFrame then warn("No mark!") return end
