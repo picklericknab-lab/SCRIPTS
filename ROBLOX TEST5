@@ -151,7 +151,7 @@ buildButton.MouseButton1Click:Connect(function()
 	local right = markedCFrame.RightVector
 	local up = Vector3.new(0,1,0)
 	local halfW = math.floor(width/2)
-	local verticalRise = 2.5
+	local verticalRise = 3
 	local forwardOffset = 2.5
 
 	for step = 0, steps-1 do
