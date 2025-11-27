@@ -160,7 +160,7 @@ buildButton.MouseButton1Click:Connect(function()
 			local pos = startPos + forward*step*forwardOffset + right*x*tileSize + up*step*verticalRise
 			local cf = CFrame.new(pos, pos + forward) * CFrame.Angles(math.rad(45), 0, 0)
 			buildRemote:InvokeServer("Metal Sheet", cf, workspace:WaitForChild("Surface"))
-			task.wait(0.04)
+			task.wait(0.03)
 		end
 	end
 
