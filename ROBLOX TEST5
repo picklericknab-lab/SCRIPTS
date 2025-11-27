@@ -153,7 +153,7 @@ buildButton.MouseButton1Click:Connect(function()
 	local up = Vector3.new(0,1,0)
 	local halfW = math.floor(width/2)
 	local verticalRise = 2.5
-	local forwardOffset = 2.5
+	local forwardOffset = 1.44
 
 	for step = 0, steps-1 do
 		for x = -halfW, halfW-1 + (width%2) do
