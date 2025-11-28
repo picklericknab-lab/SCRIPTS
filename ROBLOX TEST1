@@ -139,7 +139,7 @@ minimizeBtn.MouseButton1Click:Connect(function()
 	minimized = not minimized
 	if minimized then
 		for _,el in pairs(elementsToHide) do el.Visible=false end
-		frame.Size = UDim2.new(0,80,0,25)
+		frame.Size = UDim2.new(0,105,0,25)
 		close.Position = UDim2.new(1,-25,0,2)
 		minimizeBtn.Position = UDim2.new(1,-50,0,2)
 		trashBtn.Position = UDim2.new(1,-75,0,2)
