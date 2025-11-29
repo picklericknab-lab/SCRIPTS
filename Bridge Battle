@@ -1,0 +1,243 @@
+-- Delta-ready Teleporter GUI (Single Button "B" Version)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+if not LocalPlayer then repeat wait() until Players.LocalPlayer; LocalPlayer = Players.LocalPlayer end
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Helper to get HRP
+local function getHRP()
+	local char = LocalPlayer.Character
+	if not char then return nil end
+	return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+end
+
+-- stored CFrames
+local stored = {B={marked=false, cframe=nil}}
+local spamming = {B=false}
+
+-- ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "DeltaTeleporterGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = PlayerGui
+
+-- Main Frame
+local frame = Instance.new("Frame")
+frame.Name = "MainFrame"
+frame.Size = UDim2.new(0, 220, 0, 160)
+frame.Position = UDim2.new(0.5, -110, 0.5, -80)
+frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+
+-- Titlebar
+local title = Instance.new("Frame")
+title.Name = "TitleBar"
+title.Size = UDim2.new(1,0,0,28)
+title.BackgroundColor3 = Color3.fromRGB(22,22,22)
+title.BorderSizePixel = 0
+title.Parent = frame
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1,-60,1,0)
+titleLabel.Position = UDim2.new(0,10,0,0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "Teleporter"
+titleLabel.TextColor3 = Color3.fromRGB(220,220,220)
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = title
+
+-- Minimize & Close buttons
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Size = UDim2.new(0,28,0,20)
+minimizeBtn.Position = UDim2.new(1,-60,0,4)
+minimizeBtn.Text="_"
+minimizeBtn.Name="Minimize"
+minimizeBtn.Parent=title
+minimizeBtn.BackgroundColor3=Color3.fromRGB(100,100,100)
+minimizeBtn.TextColor3=Color3.new(1,1,1)
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0,28,0,20)
+closeBtn.Position = UDim2.new(1,-30,0,4)
+closeBtn.Text="X"
+closeBtn.Name="Close"
+closeBtn.Parent=title
+closeBtn.BackgroundColor3=Color3.fromRGB(200,50,50)
+closeBtn.TextColor3=Color3.new(1,1,1)
+
+-- Content holder
+local content = Instance.new("Frame")
+content.Name="Content"
+content.Size=UDim2.new(1,0,1,-28)
+content.Position=UDim2.new(0,0,0,28)
+content.BackgroundTransparency=1
+content.Parent=frame
+
+-- Teleport routine (teleports to target and back)
+local function teleportBlink(targetCF)
+	local hrp = getHRP()
+	if not hrp then return false end
+	local originalCF = hrp.CFrame
+	local ok = pcall(function()
+		hrp.CFrame = targetCF
+		task.wait()
+		hrp.CFrame = originalCF
+	end)
+	return ok
+end
+
+-- performTeleport: used by manual button and spam loop
+local function performTeleport(key, ui)
+	local data = stored[key]
+	if not data or not data.marked or not data.cframe then
+		if ui and ui.StateLabel then ui.StateLabel.Text = "No coord saved" end
+		return false
+	end
+
+	local ok = teleportBlink(data.cframe + Vector3.new(0,0.5,0))
+	if ui and ui.StateLabel then ui.StateLabel.Text = ok and (key.." Blinked") or "Teleport failed" end
+	return ok
+end
+
+-- Format Vector3
+local function fmtVec3(v)
+	if not v then return "nil" end
+	return string.format("X: %.1f\nY: %.1f\nZ: %.1f",v.X,v.Y,v.Z)
+end
+
+-- Column (only for B)
+local function makeColumn(name)
+	local cont = Instance.new("Frame")
+	cont.Size=UDim2.new(1,-20,1,-20)
+	cont.Position=UDim2.new(0,10,0,10)
+	cont.BackgroundTransparency=1
+	cont.Parent=content
+
+	-- Coordinate checkmark
+	local check = Instance.new("TextButton")
+	check.Size=UDim2.new(0,28,0,28)
+	check.Position=UDim2.new(0.25,-14,0,0)
+	check.Text=""
+	check.Name=name.."_Check"
+	check.Parent=cont
+	check.BackgroundColor3=Color3.fromRGB(70,70,70)
+	check.TextColor3=Color3.new(1,1,1)
+
+	-- Spam checkmark
+	local spamCheck = Instance.new("TextButton")
+	spamCheck.Size=UDim2.new(0,28,0,28)
+	spamCheck.Position=UDim2.new(0.75,-14,0,0)
+	spamCheck.Text=""
+	spamCheck.Name=name.."_SpamCheck"
+	spamCheck.Parent=cont
+	spamCheck.BackgroundColor3=Color3.fromRGB(150,50,50)
+	spamCheck.TextColor3=Color3.new(1,1,1)
+
+	local stateLabel = Instance.new("TextLabel")
+	stateLabel.Size=UDim2.new(1,0,0,18)
+	stateLabel.Position=UDim2.new(0,0,0,34)
+	stateLabel.BackgroundTransparency=1
+	stateLabel.Text="Not marked"
+	stateLabel.TextColor3=Color3.fromRGB(200,200,200)
+	stateLabel.Font=Enum.Font.SourceSans
+	stateLabel.TextSize=14
+	stateLabel.Parent=cont
+
+	local mainBtn = Instance.new("TextButton")
+	mainBtn.Size=UDim2.new(0,120,0,46)
+	mainBtn.Position=UDim2.new(0.5,-60,0,58)
+	mainBtn.Text=name
+	mainBtn.Font=Enum.Font.SourceSansBold
+	mainBtn.TextSize=22
+	mainBtn.Name=name.."_Button"
+	mainBtn.Parent=cont
+	mainBtn.BackgroundColor3=Color3.fromRGB(60,130,220)
+	mainBtn.TextColor3=Color3.new(1,1,1)
+
+	local coordLabel = Instance.new("TextLabel")
+	coordLabel.Size=UDim2.new(1,0,0,30)
+	coordLabel.Position=UDim2.new(0,0,0,108)
+	coordLabel.BackgroundTransparency=1
+	coordLabel.Text="No coord saved"
+	coordLabel.TextWrapped=true
+	coordLabel.TextColor3=Color3.fromRGB(180,180,180)
+	coordLabel.Font=Enum.Font.SourceSans
+	coordLabel.TextSize=13
+	coordLabel.Parent=cont
+
+	-- Spam check logic
+	spamCheck.MouseButton1Click:Connect(function()
+		spamming[name] = not spamming[name]
+		spamCheck.BackgroundColor3 = spamming[name] and Color3.fromRGB(80,200,120) or Color3.fromRGB(150,50,50)
+
+		if spamming[name] then
+			task.spawn(function()
+				while spamming[name] do
+					pcall(function() performTeleport(name, {StateLabel = stateLabel}) end)
+					task.wait(0)
+				end
+			end)
+		end
+	end)
+
+	return {Container=cont,Check=check,SpamCheck=spamCheck,StateLabel=stateLabel,MainBtn=mainBtn,CoordLabel=coordLabel}
+end
+
+local B_UI = makeColumn("B")
+
+-- Toggle mark (saves coordinate)
+local function toggleMark(key,ui)
+	if stored[key].marked then
+		stored[key].marked=false
+		stored[key].cframe=nil
+		ui.Check.Text=""
+		ui.StateLabel.Text="Not marked"
+		ui.CoordLabel.Text="No coord saved"
+		ui.MainBtn.BackgroundColor3=Color3.fromRGB(60,130,220)
+	else
+		local hrp=getHRP()
+		if not hrp then ui.StateLabel.Text="No character"; return end
+		local cf=hrp.CFrame
+		stored[key].marked=true
+		stored[key].cframe=cf
+		ui.Check.Text="✓"
+		ui.StateLabel.Text="Marked"
+		ui.CoordLabel.Text=fmtVec3(cf.Position)
+		ui.MainBtn.BackgroundColor3=Color3.fromRGB(80,200,120)
+	end
+end
+
+B_UI.Check.MouseButton1Click:Connect(function() toggleMark("B",B_UI) end)
+B_UI.MainBtn.MouseButton1Click:Connect(function() performTeleport("B", B_UI) end)
+
+-- Close
+closeBtn.MouseButton1Click:Connect(function() screenGui:Destroy() end)
+
+-- Draggable
+frame.Active=true
+frame.Draggable=true
+
+-- Minimize
+local minimized=false
+local originalSize=frame.Size
+local elementsToHide={content}
+minimizeBtn.MouseButton1Click:Connect(function()
+	minimized=not minimized
+	if minimized then
+		for _,el in pairs(elementsToHide) do el.Visible=false end
+		frame.Size=UDim2.new(0,63,0,25)
+	else
+		for _,el in pairs(elementsToHide) do el.Visible=true end
+		frame.Size=originalSize
+	end
+end)
+
+-- Auto-update coord labels
+RunService.Heartbeat:Connect(function()
+	local data = stored.B
+	if data.marked and data.cframe then
+		B_UI.CoordLabel.Text=fmtVec3(data.cframe.Position)
+	end
+end)
