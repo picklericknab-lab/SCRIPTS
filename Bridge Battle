@@ -82,7 +82,6 @@ local function teleportBlink(targetCF)
 	local originalCF = hrp.CFrame
 	local ok = pcall(function()
 		hrp.CFrame = targetCF
-		task.wait()
 		hrp.CFrame = originalCF
 	end)
 	return ok
@@ -176,7 +175,7 @@ local function makeColumn(name)
 			task.spawn(function()
 				while spamming[name] do
 					pcall(function() performTeleport(name, {StateLabel = stateLabel}) end)
-					task.wait(0)
+					task.wait(1)
 				end
 			end)
 		end
