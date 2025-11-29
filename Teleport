@@ -1,0 +1,112 @@
+--// LocalScript: Coordinate Display + Teleporter GUI
+
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+
+--// GUI
+local gui = Instance.new("ScreenGui")
+gui.Parent = player:WaitForChild("PlayerGui")
+gui.Name = "CoordGUI"
+gui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame")
+frame.Parent = gui
+frame.Size = UDim2.new(0, 260, 0, 160)
+frame.Position = UDim2.new(0.5, -130, 0.7, -80)
+frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+
+--// Close Button
+local closeBtn = Instance.new("TextButton")
+closeBtn.Parent = frame
+closeBtn.Size = UDim2.new(0, 25, 0, 25)
+closeBtn.Position = UDim2.new(1, -28, 0, 5)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.new(1, 1, 1)
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+closeBtn.Font = Enum.Font.SourceSansBold
+closeBtn.TextSize = 18
+
+closeBtn.MouseButton1Click:Connect(function()
+	gui:Destroy()
+end)
+
+--// Position Label
+local posLabel = Instance.new("TextLabel")
+posLabel.Parent = frame
+posLabel.Size = UDim2.new(1, -20, 0, 25)
+posLabel.Position = UDim2.new(0, 10, 0, 40)
+posLabel.BackgroundTransparency = 1
+posLabel.TextColor3 = Color3.new(1, 1, 1)
+posLabel.Font = Enum.Font.SourceSansBold
+posLabel.TextSize = 16
+posLabel.Text = "Position: Loading..."
+
+--// Copy Button
+local copyBtn = Instance.new("TextButton")
+copyBtn.Parent = frame
+copyBtn.Size = UDim2.new(0, 80, 0, 25)
+copyBtn.Position = UDim2.new(1, -90, 0, 40)
+copyBtn.Text = "Copy"
+copyBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 255)
+copyBtn.TextColor3 = Color3.new(1, 1, 1)
+copyBtn.Font = Enum.Font.SourceSansBold
+copyBtn.TextSize = 16
+
+copyBtn.MouseButton1Click:Connect(function()
+	setclipboard(posLabel.Text)
+	copyBtn.Text = "Copied!"
+	task.wait(1)
+	copyBtn.Text = "Copy"
+end)
+
+--// Teleport Input Box
+local tpBox = Instance.new("TextBox")
+tpBox.Parent = frame
+tpBox.Size = UDim2.new(1, -20, 0, 30)
+tpBox.Position = UDim2.new(0, 10, 0, 75)
+tpBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+tpBox.PlaceholderText = "Enter X, Y, Z"
+tpBox.TextColor3 = Color3.new(1, 1, 1)
+tpBox.Font = Enum.Font.SourceSans
+tpBox.TextSize = 16
+
+--// Teleport Button
+local tpBtn = Instance.new("TextButton")
+tpBtn.Parent = frame
+tpBtn.Size = UDim2.new(1, -20, 0, 30)
+tpBtn.Position = UDim2.new(0, 10, 0, 115)
+tpBtn.Text = "Teleport"
+tpBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+tpBtn.TextColor3 = Color3.new(1, 1, 1)
+tpBtn.Font = Enum.Font.SourceSansBold
+tpBtn.TextSize = 16
+
+tpBtn.MouseButton1Click:Connect(function()
+	local text = tpBox.Text
+	local x, y, z = text:match("(-?%d+%.?%d*),%s*(-?%d+%.?%d*),%s*(-?%d+%.?%d*)")
+
+	if x and y and z then
+		hrp.CFrame = CFrame.new(tonumber(x), tonumber(y), tonumber(z))
+		tpBtn.Text = "Teleported!"
+		task.wait(0.8)
+		tpBtn.Text = "Teleport"
+	else
+		tpBtn.Text = "Invalid"
+		task.wait(0.8)
+		tpBtn.Text = "Teleport"
+	end
+end)
+
+--// Constantly Update Position Label
+task.spawn(function()
+	while gui.Parent do
+		local pos = hrp.Position
+		posLabel.Text = string.format("Position: %.2f, %.2f, %.2f", pos.X, pos.Y, pos.Z)
+		task.wait(0.1)
+	end
+end)
