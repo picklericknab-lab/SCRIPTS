@@ -1,0 +1,103 @@
+--// Create ScreenGui
+local gui = Instance.new("ScreenGui")
+gui.Name = "ClickPointerGui"
+gui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+gui.ResetOnSpawn = false
+
+--// Main red draggable circle
+local circle = Instance.new("Frame")
+circle.Name = "Pointer"
+circle.Size = UDim2.new(0, 50, 0, 50)
+circle.Position = UDim2.new(0, 200, 0, 200)
+circle.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+circle.BorderSizePixel = 0
+circle.AnchorPoint = Vector2.new(0.5, 0.5)
+circle.Parent = gui
+
+local uiCorner = Instance.new("UICorner", circle)
+uiCorner.CornerRadius = UDim.new(1, 0)
+
+--// ON/OFF button
+local toggle = Instance.new("TextButton")
+toggle.Name = "Toggle"
+toggle.Size = UDim2.new(0, 40, 0, 25)
+toggle.Position = UDim2.new(1, 10, 0.5, -12)
+toggle.AnchorPoint = Vector2.new(0, 0.5)
+toggle.Text = "OFF"
+toggle.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggle.Parent = circle
+
+local toggleCorner = Instance.new("UICorner", toggle)
+toggleCorner.CornerRadius = UDim.new(0.4, 0)
+
+--// X Close button
+local closeBtn = Instance.new("TextButton")
+closeBtn.Name = "Close"
+closeBtn.Size = UDim2.new(0, 20, 0, 20)
+closeBtn.Position = UDim2.new(1, 0, 0, -20)
+closeBtn.Text = "X"
+closeBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.Parent = circle
+
+local closeCorner = Instance.new("UICorner", closeBtn)
+closeCorner.CornerRadius = UDim.new(0.4, 0)
+
+--// Draggable logic
+local dragging = false
+local dragStart, startPos
+
+circle.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPos = circle.Position
+	end
+end)
+
+circle.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = false
+	end
+end)
+
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = input.Position - dragStart
+		circle.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+
+--// ON/OFF click spam logic
+local clicking = false
+
+toggle.MouseButton1Click:Connect(function()
+	clicking = not clicking
+	if clicking then
+		toggle.Text = "ON"
+		toggle.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+	else
+		toggle.Text = "OFF"
+		toggle.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+	end
+end)
+
+--// Function to simulate left click
+local VirtualInput = game:GetService("VirtualInputManager")
+
+task.spawn(function()
+	while true do
+		task.wait(0.05) -- click speed (20 CPS)
+		if clicking then
+			local absPos = circle.AbsolutePosition + (circle.AbsoluteSize / 2)
+			VirtualInput:SendMouseButtonEvent(absPos.X, absPos.Y, 0, true, nil, 0)
+			VirtualInput:SendMouseButtonEvent(absPos.X, absPos.Y, 0, false, nil, 0)
+		end
+	end
+end)
+
+--// Close GUI
+closeBtn.MouseButton1Click:Connect(function()
+	gui:Destroy()
+end)
