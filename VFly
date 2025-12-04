@@ -1,0 +1,140 @@
+-- Delta-ready Sit-Fly GUI
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Helper: get HumanoidRootPart
+local function getHRP()
+	local char = LocalPlayer.Character
+	if not char then return nil end
+	return char:FindFirstChild("HumanoidRootPart")
+end
+
+local function getHumanoid()
+	local char = LocalPlayer.Character
+	if not char then return nil end
+	return char:FindFirstChildOfClass("Humanoid")
+end
+
+-- Fly State
+local flying = false
+local movement = Vector3.zero
+local speed = 2
+local fastMultiplier = 3
+
+-- GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "DeltaSitFlyGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = PlayerGui
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0,220,0,90)
+frame.Position = UDim2.new(0.5,-110,0.5,-45)
+frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+
+local title = Instance.new("Frame")
+title.Size = UDim2.new(1,0,0,28)
+title.BackgroundColor3 = Color3.fromRGB(22,22,22)
+title.BorderSizePixel = 0
+title.Parent = frame
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1,-60,1,0)
+titleLabel.Position = UDim2.new(0,10,0,0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "VFly"
+titleLabel.TextColor3 = Color3.fromRGB(220,220,220)
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = title
+
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Size = UDim2.new(0,28,0,20)
+minimizeBtn.Position = UDim2.new(1,-60,0,4)
+minimizeBtn.Text="_"
+minimizeBtn.BackgroundColor3=Color3.fromRGB(100,100,100)
+minimizeBtn.TextColor3=Color3.new(1,1,1)
+minimizeBtn.Parent = title
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0,28,0,20)
+closeBtn.Position = UDim2.new(1,-30,0,4)
+closeBtn.Text="X"
+closeBtn.BackgroundColor3=Color3.fromRGB(200,50,50)
+closeBtn.TextColor3=Color3.new(1,1,1)
+closeBtn.Parent = title
+
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1,0,1,-28)
+content.Position = UDim2.new(0,0,0,28)
+content.BackgroundTransparency = 1
+content.Parent = frame
+
+local flyButton = Instance.new("TextButton")
+flyButton.Size = UDim2.new(0,180,0,40)
+flyButton.Position = UDim2.new(0.5,-90,0,10)
+flyButton.Text = "Toggle Fly"
+flyButton.Font = Enum.Font.SourceSansBold
+flyButton.TextSize = 20
+flyButton.BackgroundColor3 = Color3.fromRGB(0,120,255)
+flyButton.TextColor3 = Color3.new(1,1,1)
+flyButton.Parent = content
+
+-- Minimize/Close
+local minimized=false
+minimizeBtn.MouseButton1Click:Connect(function()
+	minimized=not minimized
+	content.Visible = not minimized
+	if minimized then frame.Size=UDim2.new(0,80,0,28) else frame.Size=UDim2.new(0,220,0,90) end
+end)
+closeBtn.MouseButton1Click:Connect(function() screenGui:Destroy() end)
+
+-- Input
+UserInputService.InputBegan:Connect(function(input)
+	if input.KeyCode == Enum.KeyCode.W then movement += Vector3.new(0,0,-1) end
+	if input.KeyCode == Enum.KeyCode.S then movement += Vector3.new(0,0,1) end
+	if input.KeyCode == Enum.KeyCode.A then movement += Vector3.new(-1,0,0) end
+	if input.KeyCode == Enum.KeyCode.D then movement += Vector3.new(1,0,0) end
+	if input.KeyCode == Enum.KeyCode.E then movement += Vector3.new(0,1,0) end
+	if input.KeyCode == Enum.KeyCode.Q then movement += Vector3.new(0,-1,0) end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+	if input.KeyCode == Enum.KeyCode.W then movement -= Vector3.new(0,0,-1) end
+	if input.KeyCode == Enum.KeyCode.S then movement -= Vector3.new(0,0,1) end
+	if input.KeyCode == Enum.KeyCode.A then movement -= Vector3.new(-1,0,0) end
+	if input.KeyCode == Enum.KeyCode.D then movement -= Vector3.new(1,0,0) end
+	if input.KeyCode == Enum.KeyCode.E then movement -= Vector3.new(0,1,0) end
+	if input.KeyCode == Enum.KeyCode.Q then movement -= Vector3.new(0,-1,0) end
+end)
+
+-- Fly Logic
+flyButton.MouseButton1Click:Connect(function()
+	flying = not flying
+end)
+
+RunService.RenderStepped:Connect(function()
+	if flying then
+		local humanoid = getHumanoid()
+		local hrp = getHRP()
+		if humanoid and hrp then
+			local speedMult = speed
+			if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then speedMult *= fastMultiplier end
+			local cam = workspace.CurrentCamera
+			local dir = (cam.CFrame.LookVector * movement.Z) + (cam.CFrame.RightVector * movement.X) + Vector3.new(0,1,0)*movement.Y
+			dir *= speedMult * 50
+
+			-- Check if player is sitting
+			if humanoid.SeatPart then
+				humanoid.SeatPart.AssemblyLinearVelocity = dir
+			else
+				hrp.AssemblyLinearVelocity = dir
+			end
+		end
+	end
+end)
