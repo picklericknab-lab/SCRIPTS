@@ -180,18 +180,14 @@ markButton.MouseButton1Click:Connect(function()
 	if forward.Magnitude == 0 then forward = Vector3.new(0, 0, -1) end
 	forward = forward.Unit
 
-	-- Place marker starting in front of player, extending forward
+	-- Place marker starting in front of player (back edge anchor)
 	local distanceInFront = 10
-	local platformFrontEdge = hrp.Position + forward * distanceInFront
-	
-	-- Calculate center position so platform extends forward from the front edge
-	local platformCenterOffset = forward * (totalZ / 2)
-	local targetPos = platformFrontEdge + platformCenterOffset
+	local backEdgePos = hrp.Position + forward * distanceInFront
 
 	markedPos = Vector3.new(
-		math.floor(targetPos.X / tileSize + 0.5) * tileSize,
+		math.floor(backEdgePos.X / tileSize + 0.5) * tileSize,
 		hrp.Position.Y - (hrp.Size.Y / 2) - 3,
-		math.floor(targetPos.Z / tileSize + 0.5) * tileSize
+		math.floor(backEdgePos.Z / tileSize + 0.5) * tileSize
 	)
 
 	-- Create segmented marker (max 500 studs per segment to stay safe)
@@ -204,13 +200,16 @@ markButton.MouseButton1Click:Connect(function()
 			local segSizeX = math.min(maxSegmentSize, totalX - sx * maxSegmentSize)
 			local segSizeZ = math.min(maxSegmentSize, totalZ - sz * maxSegmentSize)
 			
+			-- X offset (centered on width)
 			local segOffsetX = (sx * maxSegmentSize) - (totalX / 2) + (segSizeX / 2)
-			local segOffsetZ = (sz * maxSegmentSize) - (totalZ / 2) + (segSizeZ / 2)
+			
+			-- Z offset (only extends forward from back edge)
+			local segOffsetZ = (sz * maxSegmentSize) + (segSizeZ / 2)
 
 			local segment = Instance.new("Part")
 			segment.Anchored = true
 			segment.Size = Vector3.new(segSizeX, 1, segSizeZ)
-			segment.Position = markedPos + Vector3.new(segOffsetX, 0.5, segOffsetZ)
+			segment.Position = markedPos + Vector3.new(segOffsetX, 0.5, 0) + forward * segOffsetZ
 			segment.Color = Color3.fromRGB(0, 255, 0)
 			segment.Transparency = 0.4
 			segment.Material = Enum.Material.Neon
