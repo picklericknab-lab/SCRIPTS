@@ -120,7 +120,7 @@ placeButton.TextColor3 = Color3.new(1,1,1)
 --// Variables
 local minimized = false
 local markedPos = nil
-local markerPart = nil
+local markerParts = {}
 local tileSize = 4
 local spawningActive = true
 local yIncrement = 0
@@ -156,53 +156,78 @@ minimizeBtn.MouseButton1Click:Connect(function()
 end)
 
 ---------------------------------------------------------------------
--- Mark Area (CAMERA-BASED, aligned perfectly)
+-- Mark Area (CAMERA-BASED, segmented marker for large sizes)
 ---------------------------------------------------------------------
 markButton.MouseButton1Click:Connect(function()
 	spawningActive = true
-	if markerPart then markerPart:Destroy() end
+	
+	-- Clear old markers
+	for _, part in ipairs(markerParts) do
+		if part then part:Destroy() end
+	end
+	markerParts = {}
 
 	local char = player.Character or player.CharacterAdded:Wait()
 	local hrp = char:WaitForChild("HumanoidRootPart")
 	local cam = workspace.CurrentCamera
 
-	local width,length = getPlatformSize()
-	local totalX = width*tileSize
-	local totalZ = length*tileSize
+	local width, length = getPlatformSize()
+	local totalX = width * tileSize
+	local totalZ = length * tileSize
 
 	local forward = cam.CFrame.LookVector
-	forward = Vector3.new(forward.X,0,forward.Z)
-	if forward.Magnitude==0 then forward=Vector3.new(0,0,-1) end
+	forward = Vector3.new(forward.X, 0, forward.Z)
+	if forward.Magnitude == 0 then forward = Vector3.new(0, 0, -1) end
 	forward = forward.Unit
 
 	-- Place marker directly in front of player at a fixed distance
-	local distanceInFront = 10 -- Fixed distance from player
+	local distanceInFront = 10
 	local targetPos = hrp.Position + forward * distanceInFront
 
 	markedPos = Vector3.new(
-		math.floor(targetPos.X/tileSize+0.5)*tileSize,
-		hrp.Position.Y-(hrp.Size.Y/2)-3,
-		math.floor(targetPos.Z/tileSize+0.5)*tileSize
+		math.floor(targetPos.X / tileSize + 0.5) * tileSize,
+		hrp.Position.Y - (hrp.Size.Y / 2) - 3,
+		math.floor(targetPos.Z / tileSize + 0.5) * tileSize
 	)
 
-	markerPart = Instance.new("Part")
-	markerPart.Anchored = true
-	markerPart.Size = Vector3.new(totalX,1,totalZ)
-	markerPart.Position = markedPos + Vector3.new(0,0.5,0)
-	markerPart.Color = Color3.fromRGB(0,255,0)
-	markerPart.Transparency = 0.4
-	markerPart.Material = Enum.Material.Neon
-	markerPart.CanCollide = false
-	markerPart.Parent = workspace
+	-- Create segmented marker (max 500 studs per segment to stay safe)
+	local maxSegmentSize = 500
+	local segmentsX = math.ceil(totalX / maxSegmentSize)
+	local segmentsZ = math.ceil(totalZ / maxSegmentSize)
+
+	for sx = 0, segmentsX - 1 do
+		for sz = 0, segmentsZ - 1 do
+			local segSizeX = math.min(maxSegmentSize, totalX - sx * maxSegmentSize)
+			local segSizeZ = math.min(maxSegmentSize, totalZ - sz * maxSegmentSize)
+			
+			local segOffsetX = (sx * maxSegmentSize) - (totalX / 2) + (segSizeX / 2)
+			local segOffsetZ = (sz * maxSegmentSize) - (totalZ / 2) + (segSizeZ / 2)
+
+			local segment = Instance.new("Part")
+			segment.Anchored = true
+			segment.Size = Vector3.new(segSizeX, 1, segSizeZ)
+			segment.Position = markedPos + Vector3.new(segOffsetX, 0.5, segOffsetZ)
+			segment.Color = Color3.fromRGB(0, 255, 0)
+			segment.Transparency = 0.4
+			segment.Material = Enum.Material.Neon
+			segment.CanCollide = false
+			segment.Parent = workspace
+			
+			table.insert(markerParts, segment)
+		end
+	end
 end)
 
 ----------------------
 -- Stop Spawning
 ----------------------
 stopSpawnBtn.MouseButton1Click:Connect(function()
-	spawningActive=false
-	if markerPart then markerPart:Destroy() markerPart=nil end
-	markedPos=nil
+	spawningActive = false
+	for _, part in ipairs(markerParts) do
+		if part then part:Destroy() end
+	end
+	markerParts = {}
+	markedPos = nil
 end)
 
 ---------------------------------------------------------------------
@@ -223,7 +248,10 @@ placeButton.MouseButton1Click:Connect(function()
 	for x = 0, width - 1 do
 		for z = 0, length - 1 do
 			if not spawningActive then
-				if markerPart then markerPart:Destroy() markerPart = nil end
+				for _, part in ipairs(markerParts) do
+					if part then part:Destroy() end
+				end
+				markerParts = {}
 				markedPos = nil
 				return
 			end
@@ -243,10 +271,10 @@ placeButton.MouseButton1Click:Connect(function()
 	end
 
 	-- cleanup marker
-	if markerPart then
-		markerPart:Destroy()
-		markerPart = nil
+	for _, part in ipairs(markerParts) do
+		if part then part:Destroy() end
 	end
+	markerParts = {}
 	markedPos = nil
 	
 	-- Increment Y for next placement
