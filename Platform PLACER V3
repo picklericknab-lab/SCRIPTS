@@ -180,9 +180,13 @@ markButton.MouseButton1Click:Connect(function()
 	if forward.Magnitude == 0 then forward = Vector3.new(0, 0, -1) end
 	forward = forward.Unit
 
-	-- Place marker directly in front of player at a fixed distance
+	-- Place marker starting in front of player, extending forward
 	local distanceInFront = 10
-	local targetPos = hrp.Position + forward * distanceInFront
+	local platformFrontEdge = hrp.Position + forward * distanceInFront
+	
+	-- Calculate center position so platform extends forward from the front edge
+	local platformCenterOffset = forward * (totalZ / 2)
+	local targetPos = platformFrontEdge + platformCenterOffset
 
 	markedPos = Vector3.new(
 		math.floor(targetPos.X / tileSize + 0.5) * tileSize,
