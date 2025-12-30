@@ -131,7 +131,7 @@ local function getPlatformSize()
 	local width,length = text:match("(%d+)%s*x%s*(%d+)")
 	width = tonumber(width) or 9
 	length = tonumber(length) or width
-	return math.clamp(width,1,50), math.clamp(length,1,50)
+	return math.clamp(width,1,999), math.clamp(length,1,999)
 end
 
 --// Minimize logic
@@ -238,7 +238,7 @@ placeButton.MouseButton1Click:Connect(function()
 			)
 
 			buildRemote:InvokeServer("Metal Sheet", CFrame.new(pos), workspace:WaitForChild("Surface"))
-			task.wait(0.03)
+			task.wait(0.04)
 		end
 	end
 
