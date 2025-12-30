@@ -1,0 +1,245 @@
+-- FARM FOR GEMS :-)
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+
+-- ===== ANTI-AFK =====
+local VirtualUser = game:GetService("VirtualUser")
+player.Idled:Connect(function()
+	VirtualUser:CaptureController()
+	VirtualUser:ClickButton2(Vector2.new())
+end)
+
+-- ===== NOTIFICATION =====
+local function notify(title, text)
+	StarterGui:SetCore("SendNotification", {
+		Title = title,
+		Text = text,
+		Duration = 3
+	})
+end
+
+-- ===== PREVENT DUPLICATE CONNECTIONS =====
+local markerName = "RespawnDetectorMarker"
+local old = player:FindFirstChild(markerName)
+if old then old:Destroy() end
+
+local marker = Instance.new("Folder")
+marker.Name = markerName
+marker.Parent = player
+
+-- ===== SETTINGS =====
+local targetPos = Vector3.new(-20.30, 70.50, 4500.10)
+local savedPosition = targetPos -- ===== NEW: remember last position =====
+local xIncrement = 0.001
+local autoEnabled = false
+local busy = false
+local frozen = false -- to track freezing
+
+-- ===== PLATFORM + TELEPORT =====
+local function spawnPlatformAndTeleport()
+	if busy then return end
+	busy = true
+
+	local character = player.Character or player.CharacterAdded:Wait()
+	local hrp = character:WaitForChild("HumanoidRootPart")
+	local humanoid = character:WaitForChild("Humanoid")
+
+	local oldPlatform = workspace:FindFirstChild("SpawnedPlatform")
+	if oldPlatform then oldPlatform:Destroy() end
+
+	local platform = Instance.new("Part")
+	platform.Name = "SpawnedPlatform"
+	platform.Anchored = true
+	platform.Size = Vector3.new(10, 1, 10)
+	platform.Position = targetPos
+	platform.Color = Color3.fromRGB(100, 200, 255)
+	platform.Parent = workspace
+
+	task.wait(0.15)
+	hrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
+
+	-- ===== FREEZE CHARACTER ON PLATFORM =====
+	humanoid.WalkSpeed = 0
+	humanoid.JumpPower = 0
+	frozen = true
+
+	-- Monitor leaving platform to restore movement
+	spawn(function()
+		while frozen and character.Parent do
+			task.wait(0.1)
+			if not workspace:FindFirstChild("SpawnedPlatform") then
+				humanoid.WalkSpeed = 25
+				humanoid.JumpPower = 50
+				frozen = false
+			else
+				local pos = hrp.Position
+				local plat = workspace:FindFirstChild("SpawnedPlatform")
+				if plat and (pos.X < plat.Position.X - 5 or pos.X > plat.Position.X + 5
+						or pos.Z < plat.Position.Z - 5 or pos.Z > plat.Position.Z + 5) then
+					humanoid.WalkSpeed = 25
+					humanoid.JumpPower = 50
+					frozen = false
+				end
+			end
+		end
+	end)
+end
+
+-- ===== ROOF SPAWNER (3x3, CENTERED) =====
+local function spawnRoof()
+	local sheetSize = 4
+	local centerX = targetPos.X
+	local centerZ = targetPos.Z
+	local roofY = targetPos.Y + 8
+
+	for row = -1, 1 do
+		for col = -1, 1 do
+			local args = {
+				"Metal Sheet",
+				CFrame.new(
+					centerX + (col * sheetSize),
+					roofY,
+					centerZ + (row * sheetSize)
+				),
+				workspace:WaitForChild("Surface")
+			}
+
+			ReplicatedStorage
+				:WaitForChild("Remotes")
+				:WaitForChild("BuildRequest")
+				:InvokeServer(unpack(args))
+
+			task.wait(0.04)
+		end
+	end
+
+	-- ===== SPAWN LANTERN AT CENTER AFTER ROOF =====
+	local lanternArgs = {
+		"Lantern",
+		CFrame.new(
+			targetPos.X,
+			roofY + 1, -- slightly above roof center
+			targetPos.Z
+		),
+		workspace:WaitForChild("Surface")
+	}
+
+	ReplicatedStorage:WaitForChild("Remotes")
+		:WaitForChild("BuildRequest")
+		:InvokeServer(unpack(lanternArgs))
+
+	busy = false
+end
+
+-- ===== RESPAWN LOGIC =====
+player.CharacterAdded:Connect(function()
+	if not autoEnabled then return end
+
+	targetPos = Vector3.new(
+		targetPos.X + xIncrement,
+		targetPos.Y,
+		targetPos.Z
+	)
+	savedPosition = targetPos -- ===== NEW: update saved position =====
+
+	notify("Character", "Respawned")
+
+	task.wait(1)
+	spawnPlatformAndTeleport()
+	task.wait(0.2)
+	spawnRoof()
+end)
+
+-- ===== GUI =====
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "PlatformTeleporterGUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 100, 0, 30)
+frame.Position = UDim2.new(0.5, -50, 0.5, -15)
+frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+frame.Active = true
+frame.Draggable = true
+frame.Parent = screenGui
+
+local onBtn = Instance.new("TextButton")
+onBtn.Size = UDim2.new(0, 30, 0, 20)
+onBtn.Position = UDim2.new(0, 5, 0, 5)
+onBtn.Text = "ON"
+onBtn.BackgroundColor3 = Color3.fromRGB(60, 200, 60)
+onBtn.TextColor3 = Color3.new(1,1,1)
+onBtn.Font = Enum.Font.SourceSansBold
+onBtn.TextSize = 14
+onBtn.Parent = frame
+
+onBtn.MouseButton1Click:Connect(function()
+	if autoEnabled then return end
+	autoEnabled = true
+
+	-- ===== NEW: resume from last saved position =====
+	targetPos = Vector3.new(
+		savedPosition.X + xIncrement,
+		savedPosition.Y,
+		savedPosition.Z
+	)
+
+	task.spawn(function()
+		spawnPlatformAndTeleport()
+		task.wait(0.2)
+		spawnRoof()
+	end)
+end)
+
+local offBtn = Instance.new("TextButton")
+offBtn.Size = UDim2.new(0, 30, 0, 20)
+offBtn.Position = UDim2.new(0, 40, 0, 5)
+offBtn.Text = "OFF"
+offBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
+offBtn.TextColor3 = Color3.new(1,1,1)
+offBtn.Font = Enum.Font.SourceSansBold
+offBtn.TextSize = 14
+offBtn.Parent = frame
+
+offBtn.MouseButton1Click:Connect(function()
+	autoEnabled = false
+	savedPosition = targetPos -- ===== NEW: save last position =====
+	local character = player.Character
+	if character then
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			humanoid.WalkSpeed = 25
+			humanoid.JumpPower = 50
+		end
+	end
+end)
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 20, 0, 20)
+closeBtn.Position = UDim2.new(1, -25, 0, 5)
+closeBtn.Text = "X"
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+closeBtn.TextColor3 = Color3.new(1,1,1)
+closeBtn.Font = Enum.Font.SourceSansBold
+closeBtn.TextSize = 14
+closeBtn.Parent = frame
+
+closeBtn.MouseButton1Click:Connect(function()
+	autoEnabled = false
+	savedPosition = targetPos -- ===== NEW: save last position =====
+	local character = player.Character
+	if character then
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			humanoid.WalkSpeed = 25
+			humanoid.JumpPower = 50
+		end
+	end
+	screenGui:Destroy()
+end)
