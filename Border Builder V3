@@ -489,11 +489,12 @@ buildButton.MouseButton1Click:Connect(function()
 	if markerPart then markerPart:Destroy() markerPart=nil end
 end)
 
---// Button 13 - Delete stored chairs and rows 6-9
+--// Button 13 - Delete stored chairs and rows 6-9, then rebuild them
 button13.MouseButton1Click:Connect(function()
 	local removeRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("RemoveBuild")
 	local count = #builtPartsToDelete
 	
+	-- Delete all stored parts
 	for _, part in ipairs(builtPartsToDelete) do
 		if part and part.Parent then
 			local args = {part}
@@ -504,6 +505,69 @@ button13.MouseButton1Click:Connect(function()
 	
 	print("Deleted", count, "parts (chairs and rows 6-9)")
 	builtPartsToDelete = {}
+	
+	-- Wait a moment before rebuilding
+	task.wait(0.5)
+	
+	-- Rebuild rows 6-9 and chairs
+	markedCFrame = CFrame.new(baseX, baseY, 182.67)
+	local width, steps = 4, 19
+	local dir = -markedCFrame.LookVector
+	local right = markedCFrame.RightVector
+	local up = Vector3.new(0,1,0)
+	local halfW = math.floor(width/2)
+	local startPos = markedCFrame.Position
+	
+	local topStepHeight = (steps-1)*tileSize
+	local topStepForward = (steps-1)*tileSize
+	local chairRotation = CFrame.new(0, 0, 0, 1, 1.7484555314695172e-07, -7.64274186065882e-15, 0, -4.371138828673793e-08, -1, -1.7484555314695172e-07, 1, -4.371138828673793e-08)
+	
+	-- Rebuild rows 6-9 (i=5 to i=8)
+	for i = 5, 8 do
+		for x = -halfW, halfW-1 + (width%2) do
+			local pos = startPos + dir*(topStepForward + i*tileSize) + right*x*tileSize + up*topStepHeight
+			local result = buildRemote:InvokeServer("Metal Sheet", CFrame.new(pos), workspace:WaitForChild("Surface"))
+			
+			if result then
+				table.insert(builtPartsToDelete, result)
+			end
+			
+			task.wait(0.035)
+		end
+	end
+	
+	-- Rebuild chairs on row 9 (i=8)
+	local chairHeight = topStepHeight + 1.5
+	local chairPositions = {-2, -1, 0, 1}
+	local gapPositions = {-1.5, -0.5, 0.5}
+	
+	-- First layer of chairs
+	for _, xPos in ipairs(chairPositions) do
+		local chairPos = startPos + dir*(topStepForward + 8*tileSize + 0.5) + right*xPos*tileSize + up*chairHeight
+		local chairCFrame = CFrame.new(chairPos) * chairRotation
+		local result = buildRemote:InvokeServer("Dining Chair", chairCFrame, workspace:WaitForChild("Surface"))
+		
+		if result then
+			table.insert(builtPartsToDelete, result)
+		end
+		
+		task.wait(0.035)
+	end
+	
+	-- Second layer of chairs
+	for _, xPos in ipairs(gapPositions) do
+		local chairPos = startPos + dir*(topStepForward + 8*tileSize + 0.5) + right*xPos*tileSize + up*chairHeight
+		local chairCFrame = CFrame.new(chairPos) * chairRotation
+		local result = buildRemote:InvokeServer("Dining Chair", chairCFrame, workspace:WaitForChild("Surface"))
+		
+		if result then
+			table.insert(builtPartsToDelete, result)
+		end
+		
+		task.wait(0.035)
+	end
+	
+	print("Rebuilt", #builtPartsToDelete, "parts (chairs and rows 6-9)")
 end)
 
 --// Control Panel Button
