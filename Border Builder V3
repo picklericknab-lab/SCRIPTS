@@ -568,6 +568,11 @@ button13.MouseButton1Click:Connect(function()
 	end
 	
 	print("Rebuilt", #builtPartsToDelete, "parts (chairs and rows 6-9)")
+	
+	-- Increment X by 0.00001 after rebuild
+	baseX = baseX + 0.00001
+	markedCFrame = CFrame.new(baseX, baseY, 182.67) * CFrame.Angles(0, 0, 0)
+	print("X incremented by 0.00001 to:", baseX)
 end)
 
 --// Control Panel Button
