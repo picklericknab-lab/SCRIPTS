@@ -1,0 +1,626 @@
+--// LocalScript: Directional Stair Builder V4 (Fixed Stop Button + Y Increment)
+
+--// Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+--// Player
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+
+--// Variables
+local storedX = player:GetAttribute("StairBuilderX") or -7.44
+storedX = storedX + 0.002
+player:SetAttribute("StairBuilderX", storedX)
+
+local baseX = storedX
+local baseY = 3.00
+local markedCFrame = CFrame.new(baseX, baseY, 182.67) * CFrame.Angles(0, 0, 0)
+local markerPart = nil
+local tileSize = 4
+local minimized = false
+local spawningActive = true
+local isPaused = false
+local controlPanelVisible = false
+local builtPartsToDelete = {}
+
+--// Update character on respawn
+player.CharacterAdded:Connect(function(newChar)
+	char = newChar
+	hrp = char:WaitForChild("HumanoidRootPart")
+	baseX = baseX + 0.0001
+	markedCFrame = CFrame.new(baseX, baseY, 182.67) * CFrame.Angles(0, 0, 0)
+	print("Character respawned. X incremented to:", baseX)
+end)
+
+--// Remote
+local buildRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("BuildRequest")
+
+--// GUI Setup
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+gui.Name = "DirectionalStairGUI"
+gui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 220, 0, 120)
+frame.Position = UDim2.new(0.5, -110, 0.5, -60)
+frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+
+local close = Instance.new("TextButton", frame)
+close.Size = UDim2.new(0, 20, 0, 20)
+close.Position = UDim2.new(1, -25, 0, 5)
+close.Text = "X"
+close.TextColor3 = Color3.new(1, 0, 0)
+close.BackgroundColor3 = Color3.fromRGB(80, 0, 0)
+close.Font = Enum.Font.SourceSansBold
+close.TextSize = 14
+
+local minimizeBtn = Instance.new("TextButton", frame)
+minimizeBtn.Size = UDim2.new(0, 20, 0, 20)
+minimizeBtn.Position = UDim2.new(1, -50, 0, 5)
+minimizeBtn.Text = "_"
+minimizeBtn.TextColor3 = Color3.new(1, 1, 1)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+minimizeBtn.Font = Enum.Font.SourceSansBold
+minimizeBtn.TextSize = 14
+
+local controlPanelBtn = Instance.new("TextButton", frame)
+controlPanelBtn.Size = UDim2.new(0, 20, 0, 20)
+controlPanelBtn.Position = UDim2.new(1, -75, 0, 5)
+controlPanelBtn.Text = "○"
+controlPanelBtn.TextColor3 = Color3.new(1, 1, 1)
+controlPanelBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+controlPanelBtn.Font = Enum.Font.SourceSansBold
+controlPanelBtn.TextSize = 14
+
+local trashBtn = Instance.new("TextButton", frame)
+trashBtn.Size = UDim2.new(0, 35, 0, 35)
+trashBtn.Position = UDim2.new(0, 10, 0, 35)
+trashBtn.Text = "🗑️"
+trashBtn.TextColor3 = Color3.new(1, 1, 1)
+trashBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+trashBtn.Font = Enum.Font.SourceSansBold
+trashBtn.TextSize = 14
+trashBtn.Visible = false
+
+local pausePlayBtn = Instance.new("TextButton", frame)
+pausePlayBtn.Size = UDim2.new(0, 35, 0, 35)
+pausePlayBtn.Position = UDim2.new(0, 50, 0, 35)
+pausePlayBtn.Text = "⏸️"
+pausePlayBtn.TextColor3 = Color3.new(1, 1, 1)
+pausePlayBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+pausePlayBtn.Font = Enum.Font.SourceSansBold
+pausePlayBtn.TextSize = 14
+pausePlayBtn.Visible = false
+
+local stopBtn = Instance.new("TextButton", frame)
+stopBtn.Size = UDim2.new(0, 35, 0, 35)
+stopBtn.Position = UDim2.new(0, 90, 0, 35)
+stopBtn.Text = "⏹️"
+stopBtn.TextColor3 = Color3.new(1, 1, 1)
+stopBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+stopBtn.Font = Enum.Font.SourceSansBold
+stopBtn.TextSize = 14
+stopBtn.Visible = false
+
+local xIncrementBtn = Instance.new("TextButton", frame)
+xIncrementBtn.Size = UDim2.new(0, 35, 0, 35)
+xIncrementBtn.Position = UDim2.new(0, 130, 0, 35)
+xIncrementBtn.Text = "🔄"
+xIncrementBtn.TextColor3 = Color3.fromRGB(0, 255, 0)
+xIncrementBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+xIncrementBtn.Font = Enum.Font.SourceSansBold
+xIncrementBtn.TextSize = 14
+xIncrementBtn.Visible = false
+
+local button1 = Instance.new("TextButton", frame)
+button1.Size = UDim2.new(0, 35, 0, 35)
+button1.Position = UDim2.new(0, 170, 0, 35)
+button1.Text = "📐"
+button1.TextColor3 = Color3.fromRGB(0, 150, 255)
+button1.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+button1.Font = Enum.Font.SourceSansBold
+button1.TextSize = 18
+button1.Visible = false
+
+local button2 = Instance.new("TextButton", frame)
+button2.Size = UDim2.new(0, 35, 0, 35)
+button2.Position = UDim2.new(0, 10, 0, 75)
+button2.Text = "🧱"
+button2.TextColor3 = Color3.fromRGB(0, 255, 0)
+button2.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+button2.Font = Enum.Font.SourceSansBold
+button2.TextSize = 18
+button2.Visible = false
+
+local button3 = Instance.new("TextButton", frame)
+button3.Size = UDim2.new(0, 35, 0, 35)
+button3.Position = UDim2.new(0, 50, 0, 75)
+button3.Text = "☁️"
+button3.TextColor3 = Color3.fromRGB(255, 0, 255)
+button3.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+button3.Font = Enum.Font.SourceSansBold
+button3.TextSize = 18
+button3.Visible = false
+
+local button4 = Instance.new("TextButton", frame)
+button4.Size = UDim2.new(0, 35, 0, 35)
+button4.Position = UDim2.new(0, 90, 0, 75)
+button4.Text = "2️⃣🏠"
+button4.TextColor3 = Color3.fromRGB(255, 150, 0)
+button4.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+button4.Font = Enum.Font.SourceSansBold
+button4.TextSize = 12
+button4.Visible = false
+
+local button5 = Instance.new("TextButton", frame)
+button5.Size = UDim2.new(0, 35, 0, 35)
+button5.Position = UDim2.new(0, 130, 0, 75)
+button5.Text = "3️⃣🏠"
+button5.TextColor3 = Color3.fromRGB(255, 255, 0)
+button5.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+button5.Font = Enum.Font.SourceSansBold
+button5.TextSize = 12
+button5.Visible = false
+
+local button6 = Instance.new("TextButton", frame)
+button6.Size = UDim2.new(0, 35, 0, 35)
+button6.Position = UDim2.new(0, 170, 0, 75)
+button6.Text = "4️⃣🏠"
+button6.TextColor3 = Color3.fromRGB(0, 255, 255)
+button6.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+button6.Font = Enum.Font.SourceSansBold
+button6.TextSize = 12
+button6.Visible = false
+
+local button7 = Instance.new("TextButton", frame)
+button7.Size = UDim2.new(0, 35, 0, 35)
+button7.Position = UDim2.new(0, 10, 0, 115)
+button7.Text = "5️⃣🏠"
+button7.TextColor3 = Color3.fromRGB(255, 100, 100)
+button7.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+button7.Font = Enum.Font.SourceSansBold
+button7.TextSize = 12
+button7.Visible = false
+
+local button8 = Instance.new("TextButton", frame)
+button8.Size = UDim2.new(0, 35, 0, 35)
+button8.Position = UDim2.new(0, 50, 0, 115)
+button8.Text = "6️⃣🏠"
+button8.TextColor3 = Color3.fromRGB(150, 100, 255)
+button8.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+button8.Font = Enum.Font.SourceSansBold
+button8.TextSize = 12
+button8.Visible = false
+
+local button9 = Instance.new("TextButton", frame)
+button9.Size = UDim2.new(0, 35, 0, 35)
+button9.Position = UDim2.new(0, 90, 0, 115)
+button9.Text = "🔽📐"
+button9.TextColor3 = Color3.fromRGB(255, 200, 100)
+button9.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+button9.Font = Enum.Font.SourceSansBold
+button9.TextSize = 14
+button9.Visible = false
+
+local button10 = Instance.new("TextButton", frame)
+button10.Size = UDim2.new(0, 35, 0, 35)
+button10.Position = UDim2.new(0, 130, 0, 115)
+button10.Text = "🏛️"
+button10.TextColor3 = Color3.fromRGB(100, 255, 200)
+button10.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+button10.Font = Enum.Font.SourceSansBold
+button10.TextSize = 18
+button10.Visible = false
+
+local button11 = Instance.new("TextButton", frame)
+button11.Size = UDim2.new(0, 35, 0, 35)
+button11.Position = UDim2.new(0, 170, 0, 115)
+button11.Text = "🛤️"
+button11.TextColor3 = Color3.fromRGB(255, 150, 200)
+button11.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+button11.Font = Enum.Font.SourceSansBold
+button11.TextSize = 18
+button11.Visible = false
+
+local button12 = Instance.new("TextButton", frame)
+button12.Size = UDim2.new(0, 35, 0, 35)
+button12.Position = UDim2.new(0, 10, 0, 155)
+button12.Text = "🎭"
+button12.TextColor3 = Color3.fromRGB(200, 100, 255)
+button12.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+button12.Font = Enum.Font.SourceSansBold
+button12.TextSize = 18
+button12.Visible = false
+
+local button13 = Instance.new("TextButton", frame)
+button13.Size = UDim2.new(0, 35, 0, 35)
+button13.Position = UDim2.new(0, 50, 0, 155)
+button13.Text = "🗑️🪑"
+button13.TextColor3 = Color3.fromRGB(255, 0, 0)
+button13.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+button13.Font = Enum.Font.SourceSansBold
+button13.TextSize = 14
+button13.Visible = false
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, -160, 0, 25)
+title.Position = UDim2.new(0, 10, 0, 5)
+title.BackgroundTransparency = 1
+title.Text = "Border Builder"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 15
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+local sizeLabel = Instance.new("TextLabel", frame)
+sizeLabel.Size = UDim2.new(0.9, 0, 0, 15)
+sizeLabel.Position = UDim2.new(0.05, 0, 0, 35)
+sizeLabel.BackgroundTransparency = 1
+sizeLabel.Text = "Teleport Now!"
+sizeLabel.TextColor3 = Color3.new(1, 1, 1)
+sizeLabel.Font = Enum.Font.SourceSansBold
+sizeLabel.TextSize = 14
+
+local teleportButton = Instance.new("TextButton", frame)
+teleportButton.Size = UDim2.new(0.9, 0, 0, 25)
+teleportButton.Position = UDim2.new(0.05, 0, 0, 55)
+teleportButton.BackgroundColor3 = Color3.fromRGB(240, 230, 140)
+teleportButton.TextColor3 = Color3.new(1, 1, 1)
+teleportButton.Text = "Teleport"
+teleportButton.Font = Enum.Font.GothamBold
+teleportButton.TextSize = 15
+
+local stroke = Instance.new("UIStroke", teleportButton)
+stroke.Color = Color3.fromRGB(0, 0, 0)
+stroke.Thickness = 1
+stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+
+local buildButton = Instance.new("TextButton", frame)
+buildButton.Size = UDim2.new(0.9, 0, 0, 30)
+buildButton.Position = UDim2.new(0.05, 0, 0, 85)
+buildButton.Text = "Build Stairs"
+buildButton.Font = Enum.Font.SourceSans
+buildButton.TextSize = 17
+buildButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+buildButton.TextColor3 = Color3.new(1, 1, 1)
+
+local stroke2 = Instance.new("UIStroke", buildButton)
+stroke2.Color = Color3.fromRGB(0, 0, 0)
+stroke2.Thickness = 1
+stroke2.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+
+--// Helper functions
+local function parseSize(text)
+	local w, s = text:lower():match("(%d+)%s*x%s*(%d+)")
+	w = tonumber(w) or 4
+	s = tonumber(s) or 19
+	return w, s
+end
+
+local function getFacingDirection(cf)
+	local look = cf.LookVector
+	local dirs = {Vector3.new(0,0,-1), Vector3.new(0,0,1), Vector3.new(-1,0,0), Vector3.new(1,0,0)}
+	local bestDir, bestDot = dirs[1], -1
+	for _, d in ipairs(dirs) do
+		local dot = look:Dot(d)
+		if dot > bestDot then bestDot, bestDir = dot, d end
+	end
+	return bestDir
+end
+
+--// X Increment Button
+xIncrementBtn.MouseButton1Click:Connect(function()
+	baseX = baseX + 0.0001
+	markedCFrame = CFrame.new(baseX, baseY, 182.67) * CFrame.Angles(0, 0, 0)
+	print("X incremented to:", baseX)
+end)
+
+--// Teleport button
+teleportButton.MouseButton1Click:Connect(function()
+	if hrp then
+		hrp.CFrame = CFrame.new(-9.57, 3.70, 178.25)
+	end
+	baseX = baseX + 0.0002
+	markedCFrame = CFrame.new(baseX, baseY, 182.67) * CFrame.Angles(0, 0, 0)
+	print("Teleported. X incremented by 0.0002 to:", baseX)
+end)
+
+--// Build stairs - STORES PARTS FOR DELETION
+buildButton.MouseButton1Click:Connect(function()
+	spawningActive = true
+	isPaused = false
+	pausePlayBtn.Text = "⏸️"
+	builtPartsToDelete = {}
+	
+	markedCFrame = CFrame.new(baseX, baseY, 182.67)
+	if not markedCFrame then warn("No mark!") return end
+	local width, steps = 4, 19
+	local dir = -markedCFrame.LookVector
+	local right = markedCFrame.RightVector
+	local up = Vector3.new(0,1,0)
+	local halfW = math.floor(width/2)
+	local startPos = markedCFrame.Position
+
+	for step = 1, steps do
+		if not spawningActive then return end
+		while isPaused and spawningActive do task.wait(0.1) end
+		if not spawningActive then return end
+		
+		local stepHeight = (step-1)*tileSize
+		local stepForward = (step-1)*tileSize
+		for x = -halfW, halfW-1 + (width%2) do
+			local pos = startPos + dir*stepForward + right*x*tileSize + up*stepHeight
+			buildRemote:InvokeServer("Metal Sheet", CFrame.new(pos), workspace:WaitForChild("Surface"))
+			task.wait(0.035)
+		end
+	end
+	
+	local topStepHeight = (steps-1)*tileSize
+	local topStepForward = (steps-1)*tileSize
+	local platformLength = 70
+	local chairRotation = CFrame.new(0, 0, 0, 1, 1.7484555314695172e-07, -7.64274186065882e-15, 0, -4.371138828673793e-08, -1, -1.7484555314695172e-07, 1, -4.371138828673793e-08)
+	
+	for i = 0, platformLength-1 do
+		if not spawningActive then return end
+		while isPaused and spawningActive do task.wait(0.1) end
+		if not spawningActive then return end
+		
+		for x = -halfW, halfW-1 + (width%2) do
+			local pos = startPos + dir*(topStepForward + i*tileSize) + right*x*tileSize + up*topStepHeight
+			local result = buildRemote:InvokeServer("Metal Sheet", CFrame.new(pos), workspace:WaitForChild("Surface"))
+			
+			if i >= 5 and i <= 8 and result then
+				table.insert(builtPartsToDelete, result)
+			end
+			
+			task.wait(0.035)
+		end
+		
+		if i == 8 then
+			local chairHeight = topStepHeight + 1.5
+			local chairPositions = {-2, -1, 0, 1}
+			local gapPositions = {-1.5, -0.5, 0.5}
+			
+			for _, xPos in ipairs(chairPositions) do
+				if not spawningActive then return end
+				while isPaused and spawningActive do task.wait(0.1) end
+				if not spawningActive then return end
+				
+				local chairPos = startPos + dir*(topStepForward + 8*tileSize + 0.5) + right*xPos*tileSize + up*chairHeight
+				local chairCFrame = CFrame.new(chairPos) * chairRotation
+				local result = buildRemote:InvokeServer("Dining Chair", chairCFrame, workspace:WaitForChild("Surface"))
+				
+				if result then
+					table.insert(builtPartsToDelete, result)
+				end
+				
+				task.wait(0.035)
+			end
+			
+			for _, xPos in ipairs(gapPositions) do
+				if not spawningActive then return end
+				while isPaused and spawningActive do task.wait(0.1) end
+				if not spawningActive then return end
+				
+				local chairPos = startPos + dir*(topStepForward + 8*tileSize + 0.5) + right*xPos*tileSize + up*chairHeight
+				local chairCFrame = CFrame.new(chairPos) * chairRotation
+				local result = buildRemote:InvokeServer("Dining Chair", chairCFrame, workspace:WaitForChild("Surface"))
+				
+				if result then
+					table.insert(builtPartsToDelete, result)
+				end
+				
+				task.wait(0.035)
+			end
+		end
+	end
+	
+	local platformStart = startPos + dir*(topStepForward + platformLength*tileSize) + up*topStepHeight
+	local platformSize = 10
+	local halfPlatform = math.floor(platformSize/2)
+	
+	for z = 0, platformSize-1 do
+		if not spawningActive then return end
+		while isPaused and spawningActive do task.wait(0.1) end
+		if not spawningActive then return end
+		
+		for x = -halfPlatform, halfPlatform-1 do
+			local pos = platformStart + dir*(z*tileSize) + right*x*tileSize
+			buildRemote:InvokeServer("Metal Sheet", CFrame.new(pos), workspace:WaitForChild("Surface"))
+			task.wait(0.035)
+		end
+	end
+	
+	local wallHeight = topStepHeight + 2
+	
+	for x = -halfPlatform, halfPlatform-1 do
+		if not spawningActive then return end
+		while isPaused and spawningActive do task.wait(0.1) end
+		if not spawningActive then return end
+		
+		if x < -2 or x > 1 then
+			local pos = platformStart + dir*(-0.5*tileSize) + right*x*tileSize + up*(wallHeight - topStepHeight)
+			local wallCFrame = CFrame.new(pos) * CFrame.Angles(math.rad(90), 0, 0)
+			buildRemote:InvokeServer("Metal Sheet", wallCFrame, workspace:WaitForChild("Surface"))
+			task.wait(0.035)
+		end
+	end
+	
+	for x = -halfPlatform, halfPlatform-1 do
+		if not spawningActive then return end
+		while isPaused and spawningActive do task.wait(0.1) end
+		if not spawningActive then return end
+		
+		local pos = platformStart + dir*((platformSize-1)*tileSize + 0.5*tileSize) + right*x*tileSize + up*(wallHeight - topStepHeight)
+		local wallCFrame = CFrame.new(pos) * CFrame.Angles(math.rad(90), 0, 0)
+		buildRemote:InvokeServer("Metal Sheet", wallCFrame, workspace:WaitForChild("Surface"))
+		task.wait(0.035)
+	end
+	
+	for z = 0, platformSize-1 do
+		if not spawningActive then return end
+		while isPaused and spawningActive do task.wait(0.1) end
+		if not spawningActive then return end
+		
+		local pos = platformStart + dir*(z*tileSize) + right*(-halfPlatform-0.5)*tileSize + up*(wallHeight - topStepHeight)
+		local wallCFrame = CFrame.new(pos) * CFrame.Angles(0, 0, math.rad(90))
+		buildRemote:InvokeServer("Metal Sheet", wallCFrame, workspace:WaitForChild("Surface"))
+		task.wait(0.035)
+	end
+	
+	for z = 0, platformSize-1 do
+		if not spawningActive then return end
+		while isPaused and spawningActive do task.wait(0.1) end
+		if not spawningActive then return end
+		
+		local pos = platformStart + dir*(z*tileSize) + right*(halfPlatform-1+0.5)*tileSize + up*(wallHeight - topStepHeight)
+		local wallCFrame = CFrame.new(pos) * CFrame.Angles(0, 0, math.rad(90))
+		buildRemote:InvokeServer("Metal Sheet", wallCFrame, workspace:WaitForChild("Surface"))
+		task.wait(0.035)
+	end
+	
+	baseX = baseX + 0.0001
+	print("Build complete. Stored", #builtPartsToDelete, "parts for potential deletion")
+	if markerPart then markerPart:Destroy() markerPart=nil end
+end)
+
+--// Button 13 - Delete stored chairs and rows 6-9
+button13.MouseButton1Click:Connect(function()
+	local removeRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("RemoveBuild")
+	local count = #builtPartsToDelete
+	
+	for _, part in ipairs(builtPartsToDelete) do
+		if part and part.Parent then
+			local args = {part}
+			removeRemote:FireServer(unpack(args))
+			task.wait(0.01)
+		end
+	end
+	
+	print("Deleted", count, "parts (chairs and rows 6-9)")
+	builtPartsToDelete = {}
+end)
+
+--// Control Panel Button
+controlPanelBtn.MouseButton1Click:Connect(function()
+	if minimized then return end
+	
+	controlPanelVisible = not controlPanelVisible
+	
+	if controlPanelVisible then
+		frame.Size = UDim2.new(0, 220, 0, 195)
+	else
+		frame.Size = UDim2.new(0, 220, 0, 120)
+	end
+	
+	sizeLabel.Visible = not controlPanelVisible
+	teleportButton.Visible = not controlPanelVisible
+	buildButton.Visible = not controlPanelVisible
+	
+	trashBtn.Visible = controlPanelVisible
+	pausePlayBtn.Visible = controlPanelVisible
+	stopBtn.Visible = controlPanelVisible
+	xIncrementBtn.Visible = controlPanelVisible
+	button1.Visible = controlPanelVisible
+	button2.Visible = controlPanelVisible
+	button3.Visible = controlPanelVisible
+	button4.Visible = controlPanelVisible
+	button5.Visible = controlPanelVisible
+	button6.Visible = controlPanelVisible
+	button7.Visible = controlPanelVisible
+	button8.Visible = controlPanelVisible
+	button9.Visible = controlPanelVisible
+	button10.Visible = controlPanelVisible
+	button11.Visible = controlPanelVisible
+	button12.Visible = controlPanelVisible
+	button13.Visible = controlPanelVisible
+end)
+
+--// Trash button
+trashBtn.MouseButton1Click:Connect(function()
+	local destroyRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("DestroyAllBuilds")
+	destroyRemote:FireServer()
+end)
+
+--// Pause/Play button
+pausePlayBtn.MouseButton1Click:Connect(function()
+	isPaused = not isPaused
+	pausePlayBtn.Text = isPaused and "▶️" or "⏸️"
+end)
+
+--// Stop button
+stopBtn.MouseButton1Click:Connect(function()
+	spawningActive = false
+	isPaused = false
+	pausePlayBtn.Text = "⏸️"
+end)
+
+--// Close button
+close.MouseButton1Click:Connect(function()
+	gui:Destroy()
+end)
+
+--// Minimize button
+local elementsToHide = {title, sizeLabel, teleportButton, buildButton}
+minimizeBtn.MouseButton1Click:Connect(function()
+	minimized = not minimized
+	if minimized then
+		for _, el in pairs(elementsToHide) do el.Visible = false end
+		trashBtn.Visible = false
+		pausePlayBtn.Visible = false
+		stopBtn.Visible = false
+		xIncrementBtn.Visible = false
+		button1.Visible = false
+		button2.Visible = false
+		button3.Visible = false
+		button4.Visible = false
+		button5.Visible = false
+		button6.Visible = false
+		button7.Visible = false
+		button8.Visible = false
+		button9.Visible = false
+		button10.Visible = false
+		button11.Visible = false
+		button12.Visible = false
+		button13.Visible = false
+		controlPanelVisible = false
+		
+		frame.Size = UDim2.new(0, 82, 0, 25)
+		close.Position = UDim2.new(1, -25, 0, 2)
+		minimizeBtn.Position = UDim2.new(1, -50, 0, 2)
+		controlPanelBtn.Position = UDim2.new(1, -75, 0, 2)
+	else
+		title.Visible = true
+		sizeLabel.Visible = true
+		teleportButton.Visible = true
+		buildButton.Visible = true
+		
+		trashBtn.Visible = false
+		pausePlayBtn.Visible = false
+		stopBtn.Visible = false
+		xIncrementBtn.Visible = false
+		button1.Visible = false
+		button2.Visible = false
+		button3.Visible = false
+		button4.Visible = false
+		button5.Visible = false
+		button6.Visible = false
+		button7.Visible = false
+		button8.Visible = false
+		button9.Visible = false
+		button10.Visible = false
+		button11.Visible = false
+		button12.Visible = false
+		button13.Visible = false
+		
+		frame.Size = UDim2.new(0, 220, 0, 120)
+		close.Position = UDim2.new(1, -25, 0, 5)
+		minimizeBtn.Position = UDim2.new(1, -50, 0, 5)
+		controlPanelBtn.Position = UDim2.new(1, -75, 0, 5)
+	end
+end)
