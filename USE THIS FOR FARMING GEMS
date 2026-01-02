@@ -33,7 +33,7 @@ marker.Name = markerName
 marker.Parent = player
 
 -- ===== SETTINGS =====
-local targetPos = Vector3.new(-20.30, 70.50, 2000.80)
+local targetPos = Vector3.new(-20.30, 70.50, 1500.70)
 
 -- ===== PERSISTENT COORDINATE TRACKING =====
 local persistentMarker = game:GetService("ReplicatedStorage"):FindFirstChild("PersistentXCoordinate")
