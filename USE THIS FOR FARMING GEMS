@@ -33,7 +33,25 @@ marker.Name = markerName
 marker.Parent = player
 
 -- ===== SETTINGS =====
-local targetPos = Vector3.new(-20.30, 70.50, 4500.10)
+local targetPos = Vector3.new(-20.30, 70.50, 1500.80)
+
+-- ===== PERSISTENT COORDINATE TRACKING =====
+local persistentMarker = game:GetService("ReplicatedStorage"):FindFirstChild("PersistentXCoordinate")
+if persistentMarker then
+	-- Use the saved X coordinate from previous GUI instance
+	targetPos = Vector3.new(persistentMarker.Value, targetPos.Y, targetPos.Z)
+else
+	-- Create marker for first time
+	persistentMarker = Instance.new("NumberValue")
+	persistentMarker.Name = "PersistentXCoordinate"
+	persistentMarker.Value = targetPos.X
+	persistentMarker.Parent = game:GetService("ReplicatedStorage")
+end
+
+-- Increment X by 0.0002 for this GUI instance
+targetPos = Vector3.new(targetPos.X + 0.0002, targetPos.Y, targetPos.Z)
+persistentMarker.Value = targetPos.X
+
 local savedPosition = targetPos -- ===== NEW: remember last position =====
 local xIncrement = 0.001
 local autoEnabled = false
@@ -90,6 +108,35 @@ local function spawnPlatformAndTeleport()
 	end)
 end
 
+-- ===== FLOOR SPAWNER (3x3, BELOW FEET) =====
+local function spawnFloor()
+	local sheetSize = 4
+	local centerX = targetPos.X
+	local centerZ = targetPos.Z
+	local floorY = targetPos.Y - 1 -- 1 stud below feet
+
+	for row = -1, 1 do
+		for col = -1, 1 do
+			local args = {
+				"Metal Sheet",
+				CFrame.new(
+					centerX + (col * sheetSize),
+					floorY,
+					centerZ + (row * sheetSize)
+				),
+				workspace:WaitForChild("Surface")
+			}
+
+			ReplicatedStorage
+				:WaitForChild("Remotes")
+				:WaitForChild("BuildRequest")
+				:InvokeServer(unpack(args))
+
+			task.wait(0.04)
+		end
+	end
+end
+
 -- ===== ROOF SPAWNER (3x3, CENTERED) =====
 local function spawnRoof()
 	local sheetSize = 4
@@ -118,20 +165,24 @@ local function spawnRoof()
 		end
 	end
 
-	-- ===== SPAWN LANTERN AT CENTER AFTER ROOF =====
-	local lanternArgs = {
-		"Lantern",
-		CFrame.new(
-			targetPos.X,
-			roofY + 1, -- slightly above roof center
-			targetPos.Z
-		),
-		workspace:WaitForChild("Surface")
-	}
+	-- ===== SPAWN LANTERN AT CENTER AFTER ROOF (5 TIMES) =====
+	for i = 1, 5 do
+		local lanternArgs = {
+			"Lantern",
+			CFrame.new(
+				targetPos.X + (i * 0.00001),
+				roofY + 1, -- slightly above roof center
+				targetPos.Z
+			),
+			workspace:WaitForChild("Surface")
+		}
 
-	ReplicatedStorage:WaitForChild("Remotes")
-		:WaitForChild("BuildRequest")
-		:InvokeServer(unpack(lanternArgs))
+		ReplicatedStorage:WaitForChild("Remotes")
+			:WaitForChild("BuildRequest")
+			:InvokeServer(unpack(lanternArgs))
+
+		task.wait(0.04)
+	end
 
 	busy = false
 end
@@ -146,11 +197,14 @@ player.CharacterAdded:Connect(function()
 		targetPos.Z
 	)
 	savedPosition = targetPos -- ===== NEW: update saved position =====
+	persistentMarker.Value = targetPos.X -- ===== UPDATE: save to persistent memory =====
 
 	notify("Character", "Respawned")
 
 	task.wait(1)
 	spawnPlatformAndTeleport()
+	task.wait(0.2)
+	spawnFloor()
 	task.wait(0.2)
 	spawnRoof()
 end)
@@ -192,6 +246,8 @@ onBtn.MouseButton1Click:Connect(function()
 
 	task.spawn(function()
 		spawnPlatformAndTeleport()
+		task.wait(0.2)
+		spawnFloor()
 		task.wait(0.2)
 		spawnRoof()
 	end)
